@@ -2,33 +2,69 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bookmark, ArrowRight, Trash2 } from "lucide-react";
+import { Bookmark, ArrowRight, Trash2, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { companies } from "@/data/companies";
 
 export default function SavedPage() {
     const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const saved = localStorage.getItem("internsure-saved-companies");
+        const loadSavedCompanies = async () => {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
 
-        if (saved) {
-            setSavedSlugs(JSON.parse(saved));
-        }
+            if (!user) {
+                window.location.href = "/login";
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("saved_companies")
+                .select("company_slug")
+                .eq("user_id", user.id);
+
+            if (!error && data) {
+                setSavedSlugs(data.map((item) => item.company_slug));
+            }
+
+            setLoading(false);
+        };
+
+        loadSavedCompanies();
     }, []);
 
     const savedCompanies = companies.filter((company) =>
         savedSlugs.includes(company.slug)
     );
 
-    const removeCompany = (slug: string) => {
-        const updated = savedSlugs.filter((item) => item !== slug);
+    const removeCompany = async (slug: string) => {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
 
-        setSavedSlugs(updated);
-        localStorage.setItem(
-            "internsure-saved-companies",
-            JSON.stringify(updated)
+        if (!user) return;
+
+        await supabase
+            .from("saved_companies")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("company_slug", slug);
+
+        setSavedSlugs((current) =>
+            current.filter((item) => item !== slug)
         );
     };
+
+    if (loading) {
+        return (
+            <main className="flex min-h-[70vh] items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen">
@@ -43,8 +79,8 @@ export default function SavedPage() {
                     </h1>
 
                     <p className="mt-4 max-w-2xl text-[var(--muted-foreground)]">
-                        Keep companies you're interested in one place so you can compare
-                        them before applying.
+                        Companies you've saved while researching internship
+                        opportunities.
                     </p>
                 </div>
             </section>
@@ -59,7 +95,7 @@ export default function SavedPage() {
                         </h2>
 
                         <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted-foreground)]">
-                            Save companies while researching internships and they will
+                            Save companies while researching internships and they'll
                             appear here.
                         </p>
 
@@ -91,8 +127,8 @@ export default function SavedPage() {
 
                                     <button
                                         onClick={() => removeCompany(company.slug)}
+                                        className="rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
                                         aria-label={`Remove ${company.name}`}
-                                        className="rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </button>

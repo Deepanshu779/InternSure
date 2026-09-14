@@ -8,12 +8,58 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
 
 export default function ShareExperiencePage() {
     const [submitted, setSubmitted] = useState(false);
 
-    function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+
+        const form = event.currentTarget;
+        const formData = new FormData(form);
+
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            alert("Please log in before submitting an experience.");
+            window.location.href = "/login";
+            return;
+        }
+
+        const { error } = await supabase.from("experiences").insert({
+            user_id: user.id,
+
+            company_name: formData.get("company"),
+            role: formData.get("role"),
+            duration: formData.get("duration"),
+            internship_year: Number(formData.get("year")),
+
+            title: formData.get("title"),
+            description: formData.get("description"),
+
+            overall_rating: Number(formData.get("overall")),
+            project_rating: Number(formData.get("projects")),
+            mentorship_rating: Number(formData.get("mentorship")),
+            communication_rating: Number(formData.get("communication")),
+            stipend_rating: Number(formData.get("stipend")),
+            learning_rating: Number(formData.get("learning")),
+
+            paid_money: formData.get("payment") === "yes",
+
+            status: "pending",
+        });
+
+        if (error) {
+            console.error("Experience submission error:", error);
+            alert(`Could not submit experience: ${error.message}`);
+            return;
+        }
+
         setSubmitted(true);
     }
 
